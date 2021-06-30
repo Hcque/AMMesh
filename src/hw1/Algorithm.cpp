@@ -1,6 +1,8 @@
 #include "Algorithm.h"
+#include <float.h>
+#include <algorithm>
 
-//计算数组lmk之间的点的路径
+//锟斤拷锟斤拷锟斤拷锟斤拷lmk之锟斤拷牡锟斤拷路锟斤拷
 void Dijkstra(PolyMesh& Mesh, int s_p, int e_p, std::vector<int>& path)
 {
 	std::priority_queue<node> que;

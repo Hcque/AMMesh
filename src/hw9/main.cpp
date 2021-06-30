@@ -1,4 +1,4 @@
-#include "PolyMesh\IOManager.h"
+#include "PolyMesh/IOManager.h"
 #include "Eigen/Dense"
 #include <queue>
 #include <map>
@@ -165,7 +165,7 @@ bool QEM_collapse(const Edge_priority &temp_edge, PolyMesh* mesh)
 		is_collapse = true;
 		vh = v_to;
 	}
-	else if (mesh->is_collapse_ok(hh_oppo))
+	 if (mesh->is_collapse_ok(hh_oppo))
 //	else if (mesh->is_collapse_ok_Triangle(hh_oppo))
 	{
 		v_from->setPosition(temp_edge.NewPoint);
@@ -273,7 +273,7 @@ void QEM(PolyMesh* mesh)
 	}
 }
 
-void main(int argc, const char **argv)
+int main(int argc, const char **argv)
 {
 	if (argc != 3)
 	{
@@ -282,10 +282,10 @@ void main(int argc, const char **argv)
 		std::cout << "Input:	ACAM_mesh_HW9.exe	input_mesh.obj	output_mesh.obj\n";
 		std::cout << std::endl;
 		std::cout << "=================================================\n";
-		return;
+		return -1;
 	}
 
-	//¶ÁÈëÍø¸ñ
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::string mesh_path = argv[1];
 	PolyMesh* mesh = new PolyMesh();
 	loadMesh(mesh_path, mesh);
@@ -303,4 +303,5 @@ void main(int argc, const char **argv)
 	end = clock();
 	std::cout << "time: " << (double)(end - start) / CLOCKS_PER_SEC << "s" << std::endl;
 	writeMesh(out_path, mesh);
+	return 0;
 }

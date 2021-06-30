@@ -2,13 +2,13 @@
 
 namespace acamcad {
 /**
-* 两个颜色和纹理坐标接近小于这个值，会被认为是同一个点
+* 锟斤拷锟斤拷锟斤拷色锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷咏锟叫★拷锟斤拷锟斤拷值锟斤拷锟结被锟斤拷为锟斤拷同一锟斤拷锟斤拷
 */
 const float ColorThreshold = 0.001f;
 
 /**
-* The RGB is 0-255, 不允许输入小于0的数
-* The RGBf is 0-1; 小于0的数会被设置为0；
+* The RGB is 0-255, 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷小锟斤拷0锟斤拷锟斤拷
+* The RGBf is 0-1; 小锟斤拷0锟斤拷锟斤拷锟结被锟斤拷锟斤拷为0锟斤拷
 */
 
 struct MRGB
@@ -184,7 +184,7 @@ inline MRGBf RGB_to_RGBF(MRGB& color)
 
 inline MRGB RGBF_to_RGB(MRGBf& color)
 {
-	return(MRGB(unsigned int(color.r * 255), unsigned int(color.g * 255), unsigned int(color.b * 255)));
+	return(MRGB(static_cast<unsigned int>(color.r * 255), static_cast<unsigned int>(color.g * 255), static_cast<unsigned int>(color.b * 255)));
 }
 
 inline MRGBAf RGBA_to_RGBAF(MRGBA& color)
@@ -194,7 +194,7 @@ inline MRGBAf RGBA_to_RGBAF(MRGBA& color)
 
 inline MRGBA RGBAF_to_RGBA(MRGBAf& color)
 {
-	return(MRGBA(unsigned int(color.r * 255), unsigned int(color.g * 255), unsigned int(color.b * 255), unsigned int(color.a * 100)));
+	return(MRGBA(static_cast<unsigned int>(color.r * 255), static_cast<unsigned int>(color.g * 255), static_cast<unsigned int>(color.b * 255), static_cast<unsigned int>(color.a * 100)));
 }
 
 /**

@@ -1,14 +1,14 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include "PolyMesh\IOManager.h"
+#include "PolyMesh/IOManager.h"
 #include "Algorithm.h"
 #include <string>
 
 using namespace acamcad;
 using namespace polymesh;
 
-void main(int argc, char** argv)
+int main(int argc, char** argv)
 {
 	//alien.obj 1 v.txt path.txt
 	if (argc != 4)
@@ -19,7 +19,7 @@ void main(int argc, char** argv)
 		std::cout << "MST:		ACAM_mesh_HW1.exe	alien.obj	vertices.txt	path.txt\n";
 		std::cout << std::endl;
 		std::cout << "=================================================\n";
-		return;
+		return -1;
 	}
 	std::string mesh_path = argv[1];
 	PolyMesh* mesh = new PolyMesh();
@@ -72,4 +72,5 @@ void main(int argc, char** argv)
 	for (auto a : edges)
 		_out << a << std::endl;
 	_out.close();
+	return 0;
 }

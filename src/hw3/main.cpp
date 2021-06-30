@@ -1,110 +1,110 @@
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include "PolyMesh\IOManager.h"
+#include "PolyMesh/IOManager.h"
 #include <string>
 
 using namespace acamcad;
 using namespace polymesh;
+using namespace std;
 
-void main(int argc, char** argv)
+int main(int argc, char** argv)
 {
-	if (argc != 5)
-	{
-		std::cout << "========== Hw3 Usage  ==========\n";
-		std::cout << std::endl;
-		std::cout << "ACAM_mesh_HW3.exe [model] [SigmaNormal] [NormalIterNum] [VertexIterNum]\n";
-		std::cout << "ACAM_mesh_HW3.exe	mesh.obj 1 8 8\n";
-		std::cout << std::endl;
-		std::cout << "=================================================\n";
-		return;
-	}
-	//读网格
-	std::string mesh_path = argv[1];
-	std::stringstream ss;
-	std::string cmd2 = argv[2], cmd3 = argv[3], cmd4 = argv[4];
-	ss << cmd2 + " " + cmd3 + " " + cmd4;
-	double SigmaCenter, SigmaNormal;
-	double NormalIterNum, VertexIterNum;
-	ss >> SigmaNormal >> NormalIterNum >> VertexIterNum;
 
-	PolyMesh* mesh = new PolyMesh();
-	loadMesh(mesh_path, mesh);
+    if (argc != 4){
+        cout << "./exe .obj 1 8" << endl;
+        return -1;
+    }
+    string mesh_path = argv[1];
+    int sigma = atoi(argv[2]);
+    int iter_num = atoi(argv[3]);
 
-	mesh->updateMeshNormal();
-	std::vector<MVector3> NewNormal(mesh->numPolygons());//每个面的法向
-	std::vector<double> FaceArea(mesh->numPolygons());//每个面的面积
-	std::vector<MPoint3> FaceCenter(mesh->numPolygons());//
+    PolyMesh *mesh = new PolyMesh();
+    loadMesh(mesh_path, mesh);
+    mesh->updateMeshNormal();
 
-	for (MPolyFace* fh : mesh->polyfaces())
-	{
-		int f_id = (*fh).index();
-		NewNormal[f_id] = (*fh).normal();
-		std::vector<MVert*> P;
-		for (FaceVertexIter vv_it = mesh->fv_iter(fh); vv_it.isValid(); ++vv_it)
-		{
-			P.push_back(*vv_it);
-		}
-		auto e12 = P[1]->position() - P[0]->position();
-		auto e13 = P[2]->position() - P[0]->position();
-		double area = cross(e12, e13).norm() * 0.5;
-		FaceArea[f_id] = area;
-		FaceCenter[f_id] = mesh->calculatFaceCenter(fh);
-	}
+    vector<MVector3> new_normal(mesh->numPolygons());
+    vector<double> face_area(mesh->numPolygons());
+    vector<MPoint3> face_center(mesh->numPolygons());
 
-	SigmaCenter = 0;
-	for (MPolyFace* fh : mesh->polyfaces())
-	{
-		int f_id = (*fh).index();
-		for (FaceFaceIter nei_fh = mesh->ff_iter(fh); nei_fh.isValid(); ++nei_fh)
-		{
-			int ff_id = (*nei_fh)->index();
-			SigmaCenter += (FaceCenter[f_id] - FaceCenter[ff_id]).norm();
-		}
-	}
-	SigmaCenter /= mesh->numPolygons() * 3;
+    for (MPolyFace *f: mesh->polyfaces() ){
+        // cout << f << endl;
+        int index = (*f).index();
+        new_normal[index] = f->normal();
+        face_center[index] = mesh->calculatFaceCenter(f);
 
-	for (int i = 0; i < NormalIterNum; i++)
-	{
-		for (MPolyFace* fh : mesh->polyfaces())
-		{
-			double Kp = 0;
-			MVector3 NewN(0, 0, 0);
-			int fh_id = (*fh).index();
-			for (FaceFaceIter nei_fh = mesh->ff_iter(fh); nei_fh.isValid(); ++nei_fh)
-			{
-				int nei_fh_id = (*nei_fh)->index();
-				double delta_center = (FaceCenter[fh_id] - FaceCenter[nei_fh_id]).norm();
-				double delta_normal = (NewNormal[fh_id] - NewNormal[nei_fh_id]).norm();
-				double Aj = FaceArea[nei_fh_id];
-				double Ws = exp(-delta_center * delta_center / (2 * SigmaCenter * SigmaCenter));
-				double Wr = exp(-delta_normal * delta_normal / (2 * SigmaNormal * SigmaNormal));
-				NewN += Aj * Ws * Wr * NewNormal[nei_fh_id];
-				Kp += Aj * Ws * Wr;
-			}
-			NewNormal[fh_id] = NewN / Kp;
-			NewNormal[fh_id] /= NewNormal[fh_id].norm();
-		}
-	}
+        vector<MVert*> points3;
+        for (FaceVertexIter fvit = mesh->fv_iter(f); fvit.isValid(); ++fvit){
+            points3.push_back((*fvit));
+        }
+        auto e20 =  points3[2]->position() - points3[0]->position();
+        auto e10 =  points3[1]->position() - points3[0]->position();
+        face_area[index] = cross(e20,e10).norm() * 0.5 ;
+    }
 
-	for (int i = 0; i < VertexIterNum; i++)
-	{
-		for (MVert* vh : mesh->vertices())
-		{
-			MPoint3 x_i = (*vh).position();
-			MPoint3 delta_xi(0, 0, 0);
-			int Nei_count = 0;
-			for (VertexFaceIter fh = mesh->vf_iter(vh); fh.isValid(); ++fh)
-			{
-				Nei_count++;
-				MPoint3 cj = mesh->calculatFaceCenter(*fh);
-				MVector3 nj = NewNormal[(*fh)->index()];
-				delta_xi = delta_xi + nj * (nj.data()[0] * (cj - x_i).data()[0] + nj.data()[1] * (cj - x_i).data()[1] + nj.data()[2] * (cj - x_i).data()[2]);
-			}
-			x_i = x_i + delta_xi / Nei_count;
-			(*vh).setPosition(x_i);
-		}
-	}
+    double sigma_c = 0.0;
+    for (MPolyFace *f: mesh->polyfaces() ){
+        // cout << f << endl;
+        int index = (*f).index();
+        for (FaceFaceIter ff = mesh->ff_iter(f); ff.isValid(); ++ff){
+            sigma_c += (face_center[index] - face_center[(*ff)->index()]).norm();
+            // cout << "sigma_c:" << sigma_c << endl;
+        }
+    }
+    sigma_c /= mesh->numPolygons() * 3 * 2;
+    cout << "sigma_c:" << sigma_c << endl;
 
-	writeMesh("result.obj", mesh);
+    // update normal
+    for (MPolyFace *f: mesh->polyfaces() ){
+        int index_i = f->index();
+        double Ws = 0;
+        double Wr = 0;
+        double Aj = 0;
+        double Kp = 0;
+        MVector3 ans(0.0, 0.0, 0.0);
+        sigma_c  = 1;
+
+        for (FaceFaceIter ff = mesh->ff_iter(f); ff.isValid(); ++ff){
+            int index_j = (*ff)->index();
+            double d_center = (face_center[index_i] - face_center[index_j]).norm();
+            double d_norm = (new_normal[index_i] - new_normal[index_j]).norm();
+            // cout << face_center[index_i] << face_center[index_j] << endl;
+            // cout << d_center << d_norm << endl;
+            Ws = exp((-1.0)* (d_center * d_center) / (2*sigma_c*sigma_c));
+            Wr = exp((-1.0)* (d_norm * d_norm) / (2*sigma*sigma));
+            Aj = face_area[index_j];
+            Kp += Wr*Ws*Aj;
+            // cout <<  Ws << Wr << Aj << Kp << endl;
+            ans += Aj*Wr*Ws * new_normal[index_j];
+        }
+        new_normal[index_i] = (ans / Kp).normalized();
+        // cout << ans[0] << endl;
+    }
+
+    // mesh->vertices
+    // update vertex
+    for (int i = 0; i < iter_num; i++){
+        for (MVert* v: mesh->vertices()){
+            int index_i = v->index();
+            MPoint3 xi = v->position();
+            cout << v->x() << " " ;
+
+            MPoint3 delta(0.0, 0.0, 0.0);
+            int n = 0;
+            for (VertexFaceIter vfit = mesh->vf_iter(v); vfit.isValid(); ++vfit){
+                n++;
+                int index_j = (*vfit)->index();
+                MVector3 nj = new_normal[index_j];
+                MPoint3 cj = mesh->calculatFaceCenter(*vfit);
+                delta = delta + dot(nj, (cj - xi)) * nj.point();
+            }
+            v->setPosition(xi + delta/(2*n*n));
+            cout << v->x() << endl;
+        }
+    }
+
+    writeMesh("outpu.obj", mesh);
+    return 0;
+    
 }

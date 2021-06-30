@@ -1,4 +1,4 @@
-#include "PolyMesh\IOManager.h"
+#include "PolyMesh/IOManager.h"
 #include <fstream>
 
 #define PI 3.14159265359
@@ -148,7 +148,7 @@ void testBasicTriangle()
 	delete(mesh);
 }
 
-void main(int argc, char** argv)
+int main(int argc, char** argv)
 {
 	if (argc != 2)
 	{
@@ -157,10 +157,10 @@ void main(int argc, char** argv)
 		std::cout << "Input:	ACAM_mesh_HW2.exe	mesh.obj\n";
 		std::cout << std::endl;
 		std::cout << "=================================================\n";
-		return;
+		return -1;
 	}
 
-	//¶ÁÈëÍø¸ñ
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 	std::string mesh_path = argv[1];
 	PolyMesh* mesh = new PolyMesh();
 	loadMesh(mesh_path, mesh);
@@ -176,4 +176,5 @@ void main(int argc, char** argv)
 	cal_local_ave_region(mesh, vertexLAR);
 	cal_mean_curvature(mesh, vertexLAR);
 	cal_gaussian_curvature(mesh, vertexLAR);
+	return 0;
 }

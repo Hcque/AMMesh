@@ -1,4 +1,4 @@
-#include "PolyMesh\IOManager.h"
+#include "PolyMesh/IOManager.h"
 #include <Eigen/Sparse>
 #define pi 3.1415926
 

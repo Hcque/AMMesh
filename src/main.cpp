@@ -1,4 +1,4 @@
-#include "PolyMesh\IOManager.h"
+#include "PolyMesh/IOManager.h"
 
 using namespace acamcad;
 using namespace polymesh;
