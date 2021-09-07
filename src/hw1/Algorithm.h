@@ -1,42 +1,25 @@
 #pragma once
 #include <PolyMesh/PolyMesh.h>
 #include <PolyMesh/PolyMesh_Base.h>
-#include <queue>
-
+#include <vector>
 using namespace acamcad;
 using namespace polymesh;
 
-struct node
-{
-	int id;
-	double dis;
-	node(int id, double d)
-	{
-		this->id = id;
-		this->dis = d;
+struct pathInfo{
+	int from, to; // in completde g
+	double dist; // weight of compledted g
+	int selected;
+	std::vector<int> path; 
+	bool operator<(const pathInfo& b){
+		return dist < b.dist;
 	}
-	bool operator<(const node& rhs) const { return dis > rhs.dis; }
+	pathInfo(){}
+	pathInfo(int _f, int _t, double _d, std::vector<int>& _p): 
+		from(_f), to(_t), dist(_d), path(_p), selected(0) {}
 };
 
-struct PathInfo
-{
-	int s_p, e_p;
-	double length;
-	std::vector<int> path;
-	PathInfo(int a, int b, double c)
-	{
-		s_p = a;
-		e_p = b;
-		length = c;
-	}
-	bool operator<(const PathInfo& rhs) const
-	{
-		return length > rhs.length;
-	}
-};
-
-//¼ÆËãÊý×élmkÖ®¼äµÄµãµÄÂ·¾¶
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lmkÖ®ï¿½ï¿½Äµï¿½ï¿½Â·ï¿½ï¿½
 void Dijkstra_group(PolyMesh& Mesh, std::vector<int>& lmk, std::vector<std::vector<int>>&path);
 
-//¼ÆËãÊý×élmkÖ®¼äµÄµãµÄÂ·¾¶
+//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½lmkÖ®ï¿½ï¿½Äµï¿½ï¿½Â·ï¿½ï¿½
 void Dijkstra(PolyMesh& Mesh, int s_p, int e_p, std::vector<int>& path);

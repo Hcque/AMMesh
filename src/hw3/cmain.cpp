@@ -1,16 +1,103 @@
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include "PolyMesh/IOManager.h"
 #include <string>
+#include <vector>
 
 using namespace acamcad;
 using namespace polymesh;
 using namespace std;
+int T = 20;
 
-int bmain(int argc, char** argv)
+std::vector<MVert*> v1,v2,v3;
+std::vector<MVert*> vers[3];
+std::vector<MVector3> normals;
+
+inline double dist(const MPoint3& v1, const MPoint3& v2){
+    return v1.distance(v2);
+}
+void test_(PolyMesh *mesh){
+
+    for (int i=0;i<mesh->numPolygons();i++){
+        auto f = mesh->polyfaces()[i];
+        auto e = f->halfEdge();
+        v1.push_back(e->fromVertex());
+        e=e->next(); v2.push_back( e->fromVertex());
+        e=e->next(); v3.push_back( e->fromVertex());
+
+        // std::cerr<<v2.size() << "\n";
+        MVector3 ans(0,0,0); double c=0;
+        for (auto it = mesh->ff_iter(f); it.isValid();it++, c+=1){
+            ans += it.cur_pointer()->normal();
+        }
+        ans /= c;
+		// std::cerr << ans[0] << "|" << ans[1] << "|" << ans[2] << "\n";
+        normals.push_back(ans);
+    }
+    vers[0] = (v1);
+    vers[1] = (v2);
+    vers[2] = (v3);
+
+    while (T--){
+        std::cerr<<"T"<<T<<"\n";
+
+    for (int i=0;i< mesh->numVertices();i++){
+        auto v = mesh->vertices()[i];
+        MVector3 dv(0,0,0); double c = 0;
+        // closet normal
+        MVector3 N; double distance=1e9;
+        for (auto vf = mesh->vf_iter(v);vf.isValid();++vf){
+            double cur = dist((*vf)->getFaceCenter(),v->position());
+            if (cur < distance) {
+                distance = cur;
+                N = (*vf)->normal();
+            }
+        }
+
+        for (auto vv = mesh->vv_iter(v);vv.isValid();++vv){
+            MVector3 h = (*vv)->position() - v->position();
+            // if (h.dot(h) < 0.5){
+                dv += h.dot(N); c+=1;
+        }
+
+        v->setPosition(v->position()+dv/c);
+    }
+
+    }
+
+	std::cerr << "Test done\n" ;
+}
+
+
+
+
+
+int cmain(int argc, char** argv)
 {
-	if (argc != 5)
+    /*
+    if (argc < 2)
+	{
+		std::cout << "========== Hw3 Usage  ==========\n";
+		std::cout << std::endl;
+		std::cout << "Input:	ACAM_mesh_HW2.exe	mesh.obj\n";
+		std::cout << std::endl;
+		std::cout << "=================================================\n";
+		return -1;
+	}
+
+    std::string mesh_path = argv[1];
+	PolyMesh* mesh = new PolyMesh();
+	loadMesh(mesh_path, mesh);
+	std::cout << "num verts: " << mesh->numVertices() << std::endl;
+
+	test_(mesh);
+    test2_(mesh);
+	delete mesh;
+    */
+
+   	if (argc != 5)
 	{
 		std::cout << "========== Hw3 Usage  ==========\n";
 		std::cout << std::endl;
@@ -32,7 +119,7 @@ int bmain(int argc, char** argv)
 	PolyMesh* mesh = new PolyMesh();
 	loadMesh(mesh_path, mesh);
 
-	mesh->updateMeshNormal();
+	// mesh->updateMeshNormal();
 	std::vector<MVector3> NewNormal(mesh->numPolygons());//ÿ����ķ���
 	std::vector<double> FaceArea(mesh->numPolygons());//ÿ��������
 	std::vector<MPoint3> FaceCenter(mesh->numPolygons());//
@@ -110,4 +197,7 @@ int bmain(int argc, char** argv)
 	cout << "output result" << endl;
 	writeMesh("result.obj", mesh);
 	return 0;
+
+   
+    
 }

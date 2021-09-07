@@ -7,7 +7,7 @@ set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
 
 #path
 SET(EIGEN_PATH "~/Desktop/eigen/Eigen")
-
+set(CMAKE_BUILD_TYPE Debug)
 ############################################################
 # Create a library
 ############################################################
@@ -106,24 +106,3 @@ target_link_libraries(${PROJECT_NAME}_HW3
 )
 
 
-
-############################################################
-# Project Homework 9
-############################################################
-
-file (GLOB HW9_FILE
-    src/hw9/*.cpp
-)
-
-# Add an executable with the above sources
-add_executable(${PROJECT_NAME}_HW9 ${HW9_FILE})
-target_include_directories(${PROJECT_NAME}_HW9
-    PRIVATE 
-        ${PROJECT_SOURCE_DIR}/include
-        ${EIGEN_PATH}
-)
-
-target_link_libraries(${PROJECT_NAME}_HW9
-    PRIVATE 
-        ACAM_mesh
-)
