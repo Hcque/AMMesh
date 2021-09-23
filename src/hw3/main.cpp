@@ -3,10 +3,18 @@
 #include <sstream>
 #include "PolyMesh/IOManager.h"
 #include <string>
+#include <cmath>
 
 using namespace acamcad;
 using namespace polymesh;
 using namespace std;
+
+double tuo;
+inline double W(double x)
+{
+	// double tuo = 0.1;
+	return exp(-(x*x)/(2* tuo*tuo));
+}
 
 int main(int argc, char** argv)
 {
@@ -15,7 +23,7 @@ int main(int argc, char** argv)
 		std::cout << "========== Hw3 Usage  ==========\n";
 		std::cout << std::endl;
 		std::cout << "ACAM_mesh_HW3.exe [model] [SigmaNormal] [NormalIterNum] [VertexIterNum]\n";
-		std::cout << "ACAM_mesh_HW3.exe	mesh.obj 1 8 8\n";
+		std::cout << "ACAM_mesh_HW3.exe	mesh.obj iter res.obj\n";
 		std::cout << std::endl;
 		std::cout << "=================================================\n";
 		return -1;
@@ -23,16 +31,18 @@ int main(int argc, char** argv)
 	//������
 	std::string mesh_path = argv[1];
 	std::stringstream ss;
-	std::string cmd2 = argv[2], cmd3 = argv[3], cmd4 = argv[4];
-	ss << cmd2 + " " + cmd3 + " " + cmd4;
+	std::string cmd2 = argv[2];
+	std::string cmd3 = argv[3];
+	std::string cmd4 = argv[4];
 	double SigmaCenter, SigmaNormal;
 	double NormalIterNum, VertexIterNum;
-	ss >> SigmaNormal >> NormalIterNum >> VertexIterNum;
+	int iter = atoi( cmd2.c_str());
+	tuo = atof(cmd4.c_str());
 
 	PolyMesh* mesh = new PolyMesh();
 	loadMesh(mesh_path, mesh);
 
-	mesh->updateMeshNormal();
+	// mesh->updateMeshNormal();
 	std::vector<MVector3> NewNormal(mesh->numPolygons());//ÿ����ķ���
 	std::vector<double> FaceArea(mesh->numPolygons());//ÿ��������
 	std::vector<MPoint3> FaceCenter(mesh->numPolygons());//
@@ -53,61 +63,43 @@ int main(int argc, char** argv)
 		FaceCenter[f_id] = mesh->calculatFaceCenter(fh);
 	}
 
-	SigmaCenter = 0;
-	for (MPolyFace* fh : mesh->polyfaces())
-	{
-		int f_id = (*fh).index();
-		for (FaceFaceIter nei_fh = mesh->ff_iter(fh); nei_fh.isValid(); ++nei_fh)
-		{
-			int ff_id = (*nei_fh)->index();
-			SigmaCenter += (FaceCenter[f_id] - FaceCenter[ff_id]).norm();
-		}
-	}
-	SigmaCenter /= mesh->numPolygons() * 3;
 
-	for (int i = 0; i < NormalIterNum; i++)
-	{
-		for (MPolyFace* fh : mesh->polyfaces())
-		{
-			double Kp = 0;
-			MVector3 NewN(0, 0, 0);
-			int fh_id = (*fh).index();
-			for (FaceFaceIter nei_fh = mesh->ff_iter(fh); nei_fh.isValid(); ++nei_fh)
-			{
-				int nei_fh_id = (*nei_fh)->index();
-				double delta_center = (FaceCenter[fh_id] - FaceCenter[nei_fh_id]).norm();
-				double delta_normal = (NewNormal[fh_id] - NewNormal[nei_fh_id]).norm();
-				double Aj = FaceArea[nei_fh_id];
-				double Ws = exp(-delta_center * delta_center / (2 * SigmaCenter * SigmaCenter));
-				double Wr = exp(-delta_normal * delta_normal / (2 * SigmaNormal * SigmaNormal));
-				NewN += Aj * Ws * Wr * NewNormal[nei_fh_id];
-				Kp += Aj * Ws * Wr;
-			}
-			NewNormal[fh_id] = NewN / Kp;
-			NewNormal[fh_id] /= NewNormal[fh_id].norm();
-		}
-	}
-
-	for (int i = 0; i < VertexIterNum; i++)
-	{
+	while (iter -- ){
+			// cout << "iter:" << iter << endl;
 		for (MVert* vh : mesh->vertices())
 		{
 			MPoint3 x_i = (*vh).position();
-			MPoint3 delta_xi(0, 0, 0);
+
+			// avg normal for that vertex
 			int Nei_count = 0;
+			MVector3 avg_normal(0,0,0);
 			for (VertexFaceIter fh = mesh->vf_iter(vh); fh.isValid(); ++fh)
 			{
 				Nei_count++;
-				MPoint3 cj = mesh->calculatFaceCenter(*fh);
-				MVector3 nj = NewNormal[(*fh)->index()];
-				delta_xi = delta_xi + nj * (nj.data()[0] * (cj - x_i).data()[0] + nj.data()[1] * (cj - x_i).data()[1] + nj.data()[2] * (cj - x_i).data()[2]);
+				avg_normal += (*fh)->normal();
 			}
-			x_i = x_i + delta_xi / Nei_count;
-			(*vh).setPosition(x_i);
+			avg_normal /= Nei_count;
+			avg_normal.normalize();
+
+			// d
+			MVector3 sum_(0,0,0);
+			double normalize = 0;
+			for (VertexVertexIter vv = mesh->vv_iter(vh); vv.isValid(); ++ vv)
+			{
+				MVector3 dpoint = (*vv)->position() - x_i;
+				double hh = dpoint.dot(avg_normal);
+				double w1 = W( sqrt(dpoint.dot(dpoint)) );
+				double w2 = W( hh );
+				sum_ += w1*w2*hh*avg_normal;
+				normalize += 1;	
+			}
+			MVector3 var = sum_ / normalize;
+			cout << var[0] << endl;
+			(*vh).setPosition( (*vh).position() + var );
 		}
 	}
 
 	cout << "output result" << endl;
-	writeMesh("result.obj", mesh);
+	writeMesh(cmd3, mesh);
 	return 0;
 }
