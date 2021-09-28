@@ -105,4 +105,23 @@ target_link_libraries(${PROJECT_NAME}_HW3
         ACAM_mesh
 )
 
+############################################################
+# Project Homework 9
+############################################################
+
+file (GLOB HW9_FILE
+    src/hw9/*.cpp
+)
+
+# Add an executable with the above sources
+add_executable(${PROJECT_NAME}_HW9 ${HW9_FILE})
+target_include_directories(${PROJECT_NAME}_HW9
+    PRIVATE 
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+target_link_libraries(${PROJECT_NAME}_HW9
+    PRIVATE 
+        ACAM_mesh
+)
 
