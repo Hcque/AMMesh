@@ -390,7 +390,7 @@ double cal_dist(int v1, int v2)
 	return 0.0;
 }
 
-double cal_cost(int v1, int v2, Eigen::Vector4d& newx )
+double cal_cost(int v1, int v2, const Eigen::Matrix4d& Q, Eigen::Vector4d& newx )
 {
 	MPoint3 X = mesh->vertices[v1].position;
 	MPoint3 Y = mesh->vertices[v2].position;
@@ -399,12 +399,7 @@ double cal_cost(int v1, int v2, Eigen::Vector4d& newx )
 	Eigen::Vector4d Y4(Y[0],Y[1], Y[2], 1.0f);
 	Eigen::Vector4d xhat = (X4+Y4) / 2;
 	newx = xhat;
-	auto error1 = xhat - X4;
-	auto error2 = xhat - Y4;
-	// std::cout 
-	double ans1 = error1.transpose() * findQ[v1] * error1 ;//+ error2.transpose() * findQ[v2] * error2 ; 
-	double ans2 = error2.transpose() * findQ[v2] * error2 ;//+ error2.transpose() * findQ[v2] * error2 ; 
-	return ans1 + ans2;
+	return xhat.transpose() * Q * xhat;
 }
 
 
@@ -438,10 +433,10 @@ void simp(Mesh* mesh)
 				// cal cost of possible contraction
 				// we choose v1+v2 as final Q
 				// v hat is the (v1+v2) / 2
-				// Eigen::Matrix4d Q = findQ[v1] + findQ[v2];
+				Eigen::Matrix4d Q = findQ[v1] + findQ[v2];
 				Eigen::Vector4d newx;
-				double cost = cal_cost(v1,v2, newx);
-				std::cerr << "=== vhat cost:" << cost << "\n";
+				double cost = cal_cost(v1,v2,Q, newx);
+				std::cerr << "cost:" << cost << "\n";
 
 				heap.push(ValidPair(v1, v2, cost, newx ));
 				
