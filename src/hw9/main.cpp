@@ -101,7 +101,7 @@ Heap heap;
 
 class Mesh
 {
-public:
+p:
 
 	struct Face{
 		mutable int dim[3];
@@ -208,6 +208,10 @@ public:
 			position[2] = k;
 			index = idx;
 		}
+		int getFaceNum()
+		{
+			return fas.size();
+		}
 
 		void add_face(const Face& f){ fas.insert(f); }
 		void remove_face(const Face& f){ fas.erase(f); }
@@ -230,6 +234,21 @@ public:
 	};
 
 public:
+
+	int getfacesNum()
+	{
+		int ans = 0;
+		for (int i = 0; i < vertices.size(); i ++ )
+		{
+			if (toDel[i] == 0)
+			{
+				ans += vertices[i].getFaceNum();
+			}
+		}
+
+
+		return ans / 3;
+	}
 	void loadMesh(std::string, Mesh* mesh);
 	void writeMesh(std::string, Mesh* mesh);
 	int numVertices() const { return vertices.size(); }
@@ -357,13 +376,15 @@ void Mesh::writeMesh(std::string mesh_path, Mesh* mesh)
 
 		for ( auto &ff : vertices[i].fas){
 			if (fascnt.find(ff) != fascnt.end()) continue;
+			else{
 			fascnt.insert(ff);
 
-					out << 'f' << " " <<
+			out << 'f' << " " <<
 			mapidx[ff.dim[0]]+1 << " " <<
 			mapidx[ff.dim[1]]+1 << " " <<
 			mapidx[ff.dim[2]]+1 << std::endl;
 			post_f_cnt ++ ; 
+			}
 		}
 	}
 }
@@ -445,7 +466,7 @@ void simp(Mesh* mesh)
 				Eigen::Matrix4d Q = findQ[v1] + findQ[v2];
 				Eigen::Vector4d newx;
 				double cost = cal_cost(v1,v2,Q, newx);
-				std::cerr << "cost:" << cost << "\n";
+				// std::cerr << "cost:" << cost << "\n";
 
 				heap.push(ValidPair(v1, v2, cost, newx ));
 				
@@ -472,6 +493,8 @@ void simp(Mesh* mesh)
 		// remove pairs linked to v1 or v2;
 		heap.remove_related(tmp.vi);		
 		heap.remove_related(tmp.vj);		
+
+		std::cerr <<  "face num" << mesh->getfacesNum() << "\n";
 
 
 		// to be continued
@@ -510,15 +533,15 @@ int main(int argc,char *argv[])
 	simp(mesh);
 
     mesh->writeMesh("./result.obj", mesh);
+	
 
     // test2_(mesh);
-	delete mesh;
 
 
 	std::cerr << " init Vertex cnt: " << initNumV << "\n";
 	std::cerr << " init Face cnt: " << init_face_cnt << "\n";
 	std::cerr << " post Vertex cnt: " << post_v_cnt << "\n";
-	std::cerr << " post Face cnt: " << post_f_cnt << "\n";
+	std::cerr << " post Face cnt: " << mesh->getfacesNum() << "\n";
 
     return 0;
 
