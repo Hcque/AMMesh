@@ -13,6 +13,8 @@
 #include <queue>
 #include <string>
 #include <fstream>
+#include <sstream>
+#include <cmath>
 #include <iostream>
 #include <algorithm>
 #include <unordered_map>
@@ -280,6 +282,7 @@ void Mesh::contract_v2(int v1, int v2, Eigen::Vector4d vhat)
 				
 			}
 		}
+		std::cerr << "constraction" << v2 << "\n";
 		// vertices
 		toDel[v2] = 1;
 		// connect neigbours  to v1
@@ -292,6 +295,7 @@ void Mesh::contract_v2(int v1, int v2, Eigen::Vector4d vhat)
 	}
 
 
+int init_face_cnt = 0;
 Mesh *mesh;
 void Mesh::loadMesh(std::string mesh_path, Mesh* mesh)
 {
@@ -300,37 +304,42 @@ void Mesh::loadMesh(std::string mesh_path, Mesh* mesh)
 
 	std::cout << "load..." << "\n";
 	std::ifstream in(mesh_path);
-	int face_cnt = 0;
-	while (in >> ch){
+	char buf[256];
 
-		// printf("%c\n", ch);
+	while (in.getline(buf, 256)){
+
+		std::stringstream ss(buf);
 		int cnt = 0;
+		ss >> ch;
 		switch (ch)
 		{
+			case '#': continue; break;
 			case 'v':
-				in >> a >> b >> c;
+				ss >> a >> b >> c;
 				// std::cout << a << b << c << "\n";
 				mesh->addVertice(a,b,c, ++cnt);
 				break;
 			case 'f':
-				in >> fa >> fb >> fc;
+				ss >> fa >> fb >> fc;
 				mesh->addFace(fa-1, fa-1,fb-1,fc-1);
 				mesh->addFace(fb-1, fb-1,fc-1,fa-1);
 				mesh->addFace(fc-1, fc-1,fa-1,fb-1);
-				face_cnt ++;
+				init_face_cnt ++;
 				break;
 		}
 	}
-	std::cerr << "Face cnt: " << face_cnt << "\n";
 }
 
 std::vector<int> mapidx;
 std::unordered_set<Mesh::Face, Mesh::Face::HashFunction> fascnt;
-
+int post_v_cnt = 0;
+int post_f_cnt = 0;
 void Mesh::writeMesh(std::string mesh_path, Mesh* mesh)
 {
 	int cnt = 0;
 	std::ofstream out(mesh_path);
+
+	std::cerr << "============" << vertices.size() << "\n";
 	for (int i=0;i<vertices.size(); i++){
 		if (toDel[i]) {
 			mapidx.push_back(-2);
@@ -341,22 +350,22 @@ void Mesh::writeMesh(std::string mesh_path, Mesh* mesh)
 			vertices[i].position[0] << " " <<
 			vertices[i].position[1] << " " <<
 			vertices[i].position[2] << std::endl;
+		post_v_cnt ++ ;
 	}
-	int cntt = 0;
 	for (int i=0;i<vertices.size(); i++){
 		if (toDel[i]) continue;
 
 		for ( auto &ff : vertices[i].fas){
 			if (fascnt.find(ff) != fascnt.end()) continue;
+			fascnt.insert(ff);
 
 					out << 'f' << " " <<
 			mapidx[ff.dim[0]]+1 << " " <<
 			mapidx[ff.dim[1]]+1 << " " <<
 			mapidx[ff.dim[2]]+1 << std::endl;
-			cntt++;
+			post_f_cnt ++ ; 
 		}
 	}
-	std::cerr << "write # of faces: " << cntt  << "\n";
 }
 
 
@@ -399,7 +408,7 @@ double cal_cost(int v1, int v2, const Eigen::Matrix4d& Q, Eigen::Vector4d& newx 
 	Eigen::Vector4d Y4(Y[0],Y[1], Y[2], 1.0f);
 	Eigen::Vector4d xhat = (X4+Y4) / 2;
 	newx = xhat;
-	return xhat.transpose() * Q * xhat;
+	return std::fabs( xhat.transpose() * Q * xhat );
 }
 
 
@@ -502,9 +511,15 @@ int main(int argc,char *argv[])
 
     mesh->writeMesh("./result.obj", mesh);
 
-	std::cout << "after processing, numV: " << mesh->numVertices() << "\n"; 
     // test2_(mesh);
 	delete mesh;
+
+
+	std::cerr << " init Vertex cnt: " << initNumV << "\n";
+	std::cerr << " init Face cnt: " << init_face_cnt << "\n";
+	std::cerr << " post Vertex cnt: " << post_v_cnt << "\n";
+	std::cerr << " post Face cnt: " << post_f_cnt << "\n";
+
     return 0;
 
 }
