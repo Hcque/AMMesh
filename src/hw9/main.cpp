@@ -8,6 +8,10 @@
 // costomized heap, Hash
 
 
+// int ? double !!!
+// points. not index for counting !
+
+
 #include "PolyMesh/IOManager.h"
 #include "Eigen/Dense"
 #include <queue>
@@ -31,77 +35,20 @@ double simp_percentage ;
 int initNumV;
 
 
-struct ValidPair
-{
-	// MEdge* me;
-	int vi, vj;
-	double cost;
-	Eigen::Vector4d vhat;
-	ValidPair() {}
-	ValidPair(int _i, int _j): vi(_i), vj(_j){
-		sort();
-	}
-	ValidPair(int _i, int _j, double _c, Eigen::Vector4d _hat): vi(_i), vj(_j),
-						cost(_c) , vhat(_hat)  {
-		sort();
-	}
-	bool operator<(const ValidPair& other) const { return cost > other.cost; } 
-	bool operator==(const ValidPair& other) const { return vi == other.vi && vj == other.vj;  } 
-	void sort()
-	{
-		if (vi > vj) std::swap(vi,vj);
-	}
-
-// https://stackoverflow.com/questions/17016175/c-unordered-map-using-a-custom-class-type-as-the-key
-
-  struct HashFunction
-  {
-    std::size_t operator()(const ValidPair& k) const
-    {
-      using std::size_t;
-      using std::hash;
-
-      // Compute individual hash values for first,
-      // second and third and combine them using XOR
-      // and bit shifting:
-
-      return (hash<int>()(k.vi) ^ (hash<int>()(k.vj) << 1) );
-    }
-  };
-
-};
 
 
-std::unordered_map<ValidPair, int, ValidPair::HashFunction> pairDup;
+// std::unordered_map<ValidPair, int, ValidPair::HashFunction> pairDup;
 std::vector<int> toDel;
 
 // template <class T>
-class Heap : public std::priority_queue<ValidPair>
-{
-public:
-	bool remove_related(const int v)
-	{
-		bool flag = false;
-		for ( auto it = this->c.begin(); it != this->c.end(); ++it)
-		{
-			if ( (*it).vi == v || (*it).vj == v ){
-				this->c.erase(it);
-				flag = true;
-			}	
-		}
-	
-		std::make_heap(this->c.begin(), this->c.end(), this->comp);
-		return flag;
-	}
-};
 
-std::unordered_map<int , Eigen::Matrix4d> findQ;
-Heap heap;
+// std::unordered_map<int , Eigen::Matrix4d> findQ;
+// Heap heap;
 
 
 class Mesh
 {
-p:
+private:
 
 	struct Face{
 		mutable int dim[3];
@@ -112,26 +59,47 @@ p:
 			sort();
 		}
 		void sort(){
-			std::sort(dim,dim+3);
+			int min_node = std::min( dim[0], std::min(dim[1], dim[2]));
+			if (min_node == dim[0]) return;
+			else if (min_node == dim[1]) {
+				// 012 ->120
+				std::swap(dim[0], dim[1]); std::swap(dim[1], dim[2]);
+			}
+			else if (min_node == dim[2])
+			{
+				// 012 -> 201
+				std::swap(dim[0], dim[1]); std::swap(dim[0], dim[2]);
+			}
+			return;
 		}
 
-		MVector3 normal() const
-		{
-			MVector3 ba = dim[1]-dim[0];
-			MVector3 ca = dim[2]-dim[0];
-			ba.normalize(); ca.normalize();
-			return ba.cross(ca);
-		}
-		bool count(int vi) const { 
+	
+		bool contain(int vi) const { 
 			return std::find(dim,dim+3, vi) != dim+3;
 		}
 
-		int find_other(int v1, int v2) const
+		int find_diff(int v1) const
+		{
+			if (dim[0] != v1) return dim[0];
+			else if (dim[1] != v1) return dim[1];
+			else if (dim[2] != v1) return dim[2];
+			else assert(0);
+		}
+		int find_diff(int v1, int v2) const
 		{
 			std::set<int> copy(std::begin(dim), std::end(dim));
 			copy.erase(v1);
 			copy.erase(v2);
 			return *copy.begin();
+		}
+
+		void replace(int v1, int v2)
+		{
+			if (dim[0] == v1) dim[0] = v2;
+			else if (dim[1] == v1) dim[1] = v2;
+			else if (dim[2] == v1) dim[2] = v2;
+			else assert(0);
+			return;
 		}
 
 		bool reset(int v2, int v1)const  // caution!
@@ -144,20 +112,12 @@ p:
 
 		bool find_other2(int v1,int& o2,int &o3) const
 		{
-			if (dim[0] == v1) o2 == dim[1], o3 = dim[2];
+			if (dim[0] == v1) o2 = dim[1], o3 = dim[2];
 			else if (dim[1] == v1) o2 = dim[0], o3 = dim[2];
-			else if (dim[2] == v1) o2 = dim[0], o3 = dim[1];
+			else if (dim[2] == v1) o2 = dim[0], o3 = dim[1]; 
 			// else assert(0);
 			else return false;
 			return true;
-		}
-		auto getEdges()const 
-		{
-			std::vector<ValidPair> ans;
-			ans.push_back(ValidPair(dim[0], dim[1]));
-			ans.push_back(ValidPair(dim[1], dim[2]));
-			ans.push_back(ValidPair(dim[0], dim[2]));
-			return ans;
 		}
 
 		friend std::ostream& operator<<(std::ostream &out, const Face& f)
@@ -199,22 +159,43 @@ p:
 	struct Vertice
 	{
 		MPoint3 position;
-		int index;
 		std:: set<Face> fas;
+		Eigen::Matrix4d Q;
+		int index;
 		Vertice(){}
-		Vertice(int i,int j, int k, int idx){
+		Vertice(double i,double j, double k, int idx){
 			position[0] = i;
 			position[1] = j;
 			position[2] = k;
 			index = idx;
+		}
+
+		void replace(double i, double j, double k, Eigen::Matrix4d _Q)
+		{
+			position[0] = i;
+			position[1] = j;
+			position[2] = k;
+			Q = _Q;
+
 		}
 		int getFaceNum()
 		{
 			return fas.size();
 		}
 
+		bool count_face(const Face& ff)
+		{
+			return fas.count(ff) > 0;
+		}
+
 		void add_face(const Face& f){ fas.insert(f); }
 		void remove_face(const Face& f){ fas.erase(f); }
+
+		double cal_dist(const Vertice& other)
+		{
+			return position.distance(other.position);
+		}
+
 
 		bool reset(int vnow, int vreplace)
 		{
@@ -224,98 +205,274 @@ p:
 			return ans;
 		}
 
-		std::set<int> oneRingNeibours()
-		{
-			std::set<int> ans;
-			for (auto &ff: fas) 
-				for (int x: ff.dim) if (x != index) ans.insert(x);
-			return ans;
-		}
+		// std::set<int> oneRingNeibours()
+		// {
+		// 	std::set<int> ans;
+		// 	for (auto &ff: fas) 
+		// 		for (int x: ff.dim) if (x != index) ans.insert(x);
+		// 	return ans;
+		// }
 	};
 
-public:
-
-	int getfacesNum()
-	{
-		int ans = 0;
-		for (int i = 0; i < vertices.size(); i ++ )
-		{
-			if (toDel[i] == 0)
-			{
-				ans += vertices[i].getFaceNum();
-			}
-		}
 
 
-		return ans / 3;
+struct ValidPair
+{
+	// MEdge* me;
+	int vi, vj, time;
+	double cost;
+	Eigen::Vector4d vhat;
+	ValidPair() {}
+	ValidPair(int _i, int _j): vi(_i), vj(_j){
+		sort();
 	}
+	ValidPair(int _i, int _j, double _c, Eigen::Vector4d _hat): vi(_i), vj(_j),
+						cost(_c) , vhat(_hat)  {
+		sort();
+	}
+	bool operator<(const ValidPair& other) const { return cost > other.cost; } 
+	bool operator==(const ValidPair& other) const { return vi == other.vi && vj == other.vj;  } 
+	void sort()
+	{
+		if (vi > vj) std::swap(vi,vj);
+	}
+
+	unsigned long long index_hash() const {
+		return ((unsigned long long)(vi) << 32) | (unsigned long long )(vj);
+	}
+
+
+// // https://stackoverflow.com/questions/17016175/c-unordered-map-using-a-custom-class-type-as-the-key
+
+//   struct HashFunction
+//   {
+//     std::size_t operator()(const ValidPair& k) const
+//     {
+//       using std::size_t;
+//       using std::hash;
+
+//       // Compute individual hash values for first,
+//       // second and third and combine them using XOR
+//       // and bit shifting:
+
+//       return (hash<int>()(k.vi) ^ (hash<int>()(k.vj) << 1) );
+//     }
+//   };
+
+};
+
+
+struct Heap
+{
+	int tstamp;
+	std::unordered_map<unsigned long long, int > times;
+	std::priority_queue<ValidPair> que;
+	std:: vector< std::set<int>> in_que_pairs;
+
+	Heap() { tstamp = 0; }
+	inline void resize_in_queue_pairs(int n)
+	{
+		in_que_pairs.resize(n);
+	}
+	void clear()
+	{
+		tstamp = 0; times.clear();
+		while (que.size()) que.pop();
+	}
+	inline bool count(unsigned long long index)
+	{
+		return (times.count(index)) ? (times[index] > 0) : false;
+	}
+
+	inline int size() { return que.size(); }
+
+	void refresh()
+	{
+		while (que.size())
+		{
+			auto pair = que.top();
+			if (pair.time == times[pair.index_hash()]) break;
+			que.pop();
+		}
+	}
+
+	void pop()
+	{
+		refresh();
+		que.pop();
+	}
+
+	ValidPair top()
+	{
+		refresh();
+		return que.top();
+	}
+
+	void push(ValidPair& pair)
+	{
+		++tstamp ;
+		pair.time = tstamp; times[pair.index_hash()] = tstamp;
+		que.push(pair);
+		in_que_pairs[pair.vi].insert(pair.vj);
+		in_que_pairs[pair.vj].insert(pair.vi);
+	}
+	void del(const ValidPair& pair)
+	{
+		times[pair.index_hash()] = -1;
+		in_que_pairs[pair.vi].erase(pair.vj);
+		in_que_pairs[pair.vj].erase(pair.vi);
+	}
+
+
+};
+
+// class Heap : public std::priority_queue<ValidPair>
+// {
+// public:
+// 	bool remove_related(const int v, int v2)
+// 	{
+// 		bool flag = false;
+// 		for ( auto it = this->c.begin(); it != this->c.end(); ++it)
+// 		{
+// 			if ( (*it).vi == v || (*it).vj == v || (*it).vi == v2 || (*it).vj == v2){
+// 				this->c.erase(it);
+// 				flag = true;
+// 			}	
+// 		}
+	
+// 		std::make_heap(this->c.begin(), this->c.end(), this->comp);
+// 		return flag;
+// 	}
+// };
+
+
+
+public:
+	Mesh() { 
+		tot = tot_face = 0; vertices.clear();  
+	}
+	~Mesh() {}
+	int tot, tot_face;
+	std::vector<Vertice> vertices;
+	std::vector<std::set<int>> edges;
+	Heap heap;
+	// for write faces
+	std::vector<int> mapidx;
+	std::unordered_set<Face, Face::HashFunction> fascnt;
+
+
+	int numFaces() ;
+	int numVertices() const ;
 	void loadMesh(std::string, Mesh* mesh);
 	void writeMesh(std::string, Mesh* mesh);
-	int numVertices() const { return vertices.size(); }
-	void contract_v2(int v1, int v2, Eigen::Vector4d);
-	
-	std::vector<Face> faces;
-	std::vector<Vertice> vertices;
+	void simp();
+	void cal_Q();
+	void select_pairs();
+	void contract(int v1, int v2, Eigen::Vector4d);
+	void contract_v2(int v1, int v2, Eigen::Vector4d vhat);
 
-	void addFace(int i, int a,int b,int c)
-	{
-		vertices[i].fas.insert(Face(a,b,c));
-	}
+	void add_kp(const Face& ff, Eigen::Matrix4d& Q);
+	void addFace(int i,  Face);
+	void addVertice(double i, double j, double k, int index);
+	MVector3 getnormal(int v1, int v2, int v3);
+	double cal_cost(int v1, int v2, Eigen::Vector4d& newx );
+	void add_pair(int v0, int v1);
+	std::set<int> oneRingNeibours(int vi);
 
-	void addVertice(int i, int j, int k, int index)
-	{
-		vertices.push_back(Vertice(i,j,k,index));
-	}
-
-	// void update_Node(int vid, MPoint3 newX)
-	// {
-	// 	vertices[vid].position = newX;
-	// }
 };
+
+int Mesh::numFaces() { 
+	int ans = 0;
+	for (int i = 0; i < vertices.size(); i ++ ) if (!toDel[i])
+		ans += vertices[i].fas.size();
+	return ans;
+ }
+
+int Mesh::numVertices() const { return vertices.size(); }
+void Mesh::addFace(int i,  Face face)
+{
+	vertices[i].fas.insert(face);
+}
+void Mesh::addVertice(double i, double j, double k, int index)
+{
+	vertices.push_back(Vertice(i,j,k,index));
+}
+MVector3 Mesh::getnormal(int v1, int v2, int v3) 
+{
+	MVector3 ba = vertices[v2].position - vertices[v1].position;
+	MVector3 ca = vertices[v3].position - vertices[v1].position;
+	// for (int k = 0 ; k< 3; k ++ ) 
+	// 	std::cout << vertices[v2].position[k] <<" ";
+	// std::cout << "\n";
+	ba.normalize(); ca.normalize();
+	return ba.cross(ca);
+}
+
+
+std::set<int> Mesh::oneRingNeibours(int vi)
+{
+	std::set<int> ans;
+	for (auto &ff: vertices[vi].fas) 
+		for (int x: ff.dim) if (x != vi) ans.insert(x);
+	return ans;
+}
 
 
 void Mesh::contract_v2(int v1, int v2, Eigen::Vector4d vhat)
 	{
 		auto faceset = vertices[v2].fas; // f1,f2, 5,6,7
 		for (auto &ff : faceset) {
-			if (ff.count(v1)) { // f1,f2
-				int vother = ff.find_other(v1,v2);
+			if (ff.contain(v1)) { // f1,f2
+				int vother = ff.find_diff(v1,v2);
 				vertices[vother].remove_face(ff);
 				vertices[v2].remove_face(ff);
 				vertices[v1].remove_face(ff);
+				tot_face--;
 			}
 			else{  // 5,6,7
-			assert(ff.count(v2));
-				if (!ff.count(v2)){
-					// vertices[v2].fas
-					std::cout << v2 << "\n";
-					for (auto & f: vertices[v2].fas) std::cout << f <<" ";
-					std::cout << std::endl;
-				}
+			assert(ff.contain(v2));
 
 				int o2,o3;
 				ff.find_other2(v2,o2,o3);
+				assert(o2 != v1);
+				assert(o3 != v1);
+				vertices[o2].remove_face(ff);
+				vertices[o3].remove_face(ff);
 
 				Face newf(v1,o2,o3);
+				if (! vertices[v1].count_face(newf)){
 				vertices[v1].add_face(newf);
-				
+				vertices[o2].add_face(newf);
+				vertices[o3].add_face(newf);
+				}
+				else {
+					--tot_face;
+				}
 			}
 		}
 		std::cerr << "constraction" << v2 << "\n";
 		// vertices
 		toDel[v2] = 1;
 		// connect neigbours  to v1
-		for (int i: vertices[v1].oneRingNeibours() )
-			vertices[i].reset(v2,v1);
+		// for (auto &sf : vertices[v1].fas) for (int j : sf.dim ) if (j != v1  && j < vertices.size() && !toDel[j])
+		// 	vertices[j].reset(v2,v1);
+
 		// update v1
-		vertices[v1].position[0] = vhat[0];
-		vertices[v1].position[1] = vhat[1];
-		vertices[v1].position[2] = vhat[2];
+		vertices[v1].replace(vhat[0], vhat[1], vhat[2], vertices[v2].Q);
+
+		// update heap
+		std::set<int > in_que_pairs1 = heap.in_que_pairs[v1];
+		std::set<int > in_que_pairs2 = heap.in_que_pairs[v2];
+		for (auto v: in_que_pairs2)
+		{
+			heap.del(ValidPair(v,v2));
+			if ( !in_que_pairs1.count(v) && v != v1) add_pair(v,v1);
+		}
+
+		for (auto v: in_que_pairs1) if (v != v2) add_pair(v,v1);
 	}
 
 
-int init_face_cnt = 0;
-Mesh *mesh;
 void Mesh::loadMesh(std::string mesh_path, Mesh* mesh)
 {
 	double a, b, c; int fa,fb,fc;
@@ -336,25 +493,28 @@ void Mesh::loadMesh(std::string mesh_path, Mesh* mesh)
 			case 'v':
 				ss >> a >> b >> c;
 				// std::cout << a << b << c << "\n";
-				mesh->addVertice(a,b,c, ++cnt);
+				mesh->addVertice(a,b,c, cnt ++ );
 				break;
 			case 'f':
 				ss >> fa >> fb >> fc;
-				mesh->addFace(fa-1, fa-1,fb-1,fc-1);
-				mesh->addFace(fb-1, fb-1,fc-1,fa-1);
-				mesh->addFace(fc-1, fc-1,fa-1,fb-1);
-				init_face_cnt ++;
+				fa--; fb--; fc--;
+				Face face(fa,fb,fc);
+				mesh->addFace(fa, face);
+				mesh->addFace(fb, face);
+				mesh->addFace(fc, face);
 				break;
 		}
 	}
 }
 
-std::vector<int> mapidx;
-std::unordered_set<Mesh::Face, Mesh::Face::HashFunction> fascnt;
-int post_v_cnt = 0;
+
+
+int post_v_cnt= 0;
 int post_f_cnt = 0;
+
 void Mesh::writeMesh(std::string mesh_path, Mesh* mesh)
 {
+	std::cout << "write..." << "\n";
 	int cnt = 0;
 	std::ofstream out(mesh_path);
 
@@ -389,126 +549,151 @@ void Mesh::writeMesh(std::string mesh_path, Mesh* mesh)
 	}
 }
 
-
-
-Eigen::Matrix4d cal_Q(int vid)
+void Mesh::add_kp(const Face& ff, Eigen::Matrix4d& Q)
 {
-	Eigen::Matrix4d ans;
+	MVector3 normal  = getnormal(ff.dim[0], ff.dim[1], ff.dim[2]);
+	//  for (int k = 0 ; k< 3; k ++ ) 
+    //         std::cout << normal(k) ;
+    //     std::cout << "\n";
+	assert( normal.dot(normal) - 1.0 < 0.001);
+	auto tmp = vertices[ff.dim[0]].position;
 
-	MPoint3 X = mesh->vertices[vid].position;
+	Eigen::Vector4d X(tmp[0], tmp[1], tmp[2] , 1);
+	double d = -1.0f * ( normal[0]*X[0] + normal[1]*X[1] + normal[2]*X[2] );
+	Eigen::Matrix<double, 4,1> p(normal[0], normal[1], normal[2], d);
+	Eigen::Matrix4d Qi = p * p.transpose();
+	Q += Qi;
+        // for (int k = 0 ; k< 4; k ++ ) for (int j = 0; j < 4; j ++ )
+        //     std::cout << Qi(k,j) << " ";
+        // std::cout << "\n";
+}
 
-	for (auto &ff : mesh->vertices[vid].fas)
-	{
-		MVector3 normal  = ff.normal();
-		assert( normal.dot(normal) - 1.0 < 0.001);
+void Mesh::cal_Q()
+{
+	std::cout << "cal Q, stored in map" << std::endl;
+	
+	for (int i=0;i< vertices.size(); i++) {
+		int vid = i;
+		vertices[i].Q.setZero();
+		for (auto& ff: vertices[i].fas)
+			add_kp(ff, vertices[i].Q);
+        // for (int k = 0 ; k< 4; k ++ ) for (int j = 0; j < 4; j ++ )
+        //     std::cout << vertices[i].Q(k,j) ;
+        // std::cout << "\n";
 
-		double d = -1.0f * ( normal[0]*X[0] + normal[1]*X[1] + normal[2]*X[2] );
-		Eigen::Matrix<double, 4,1> p(normal[0], normal[1], normal[2], d);
-		Eigen::Matrix4d Qi = p * p.transpose();
-		ans += Qi;
+		// std::cout << vid << "|" << Q.data << "\n";
 	}
-	return ans;
 }
 
-double cal_dist(int v1, int v2)
+
+double Mesh::cal_cost(int v1, int v2, Eigen::Vector4d& newx )
 {
+	MPoint3 X = vertices[v1].position;
+	MPoint3 Y = vertices[v2].position;
 
-	MPoint3 X = mesh->vertices[v1].position;
-	MPoint3 Y = mesh->vertices[v2].position;
 
-	return X.distance(Y);
-	return 0.0;
-}
+	auto Qnew =  (vertices[v1].Q + vertices[v2].Q);
 
-double cal_cost(int v1, int v2, const Eigen::Matrix4d& Q, Eigen::Vector4d& newx )
-{
-	MPoint3 X = mesh->vertices[v1].position;
-	MPoint3 Y = mesh->vertices[v2].position;
+	double det = Qnew(0,0) * (Qnew(1,1)*Qnew(2,2)-Qnew(1,2)*Qnew(1,2)) - \
+					Qnew(0,1) * (Qnew(0,1)*Qnew(2,2) - Qnew(1,2)*Qnew(2,0)) +\
+					Qnew(0,2) * (Qnew(2,1)*Qnew(1,0) - Qnew(1,1)*Qnew(2,0)) ;
+	if (fabs(det) < 1e-12){
 
 	Eigen::Vector4d X4(X[0],X[1], X[2], 1.0f);
 	Eigen::Vector4d Y4(Y[0],Y[1], Y[2], 1.0f);
-	Eigen::Vector4d xhat = (X4+Y4) / 2;
+	Eigen::Vector4d xhat = X4;
 	newx = xhat;
-	return std::fabs( xhat.transpose() * Q * xhat );
+	}
+	else {
+		Eigen::Matrix4d Qnewtmp = Qnew;
+		Qnewtmp(3,0)  = Qnewtmp(3,1) = Qnewtmp(3,2) = 0; Qnewtmp(3,3) = 1;
+		Eigen::Vector4d b(0,0,0,1);
+		auto x = Qnewtmp.colPivHouseholderQr().solve(b);
+		newx = x;
+	}
+
+	double ans =  ( newx.transpose() * Qnew * newx );
+	return ans;
 }
 
+void Mesh::select_pairs()
+{
+	std::cout << "collect valid pairs, push in to heap" << std::endl;
 
+	double mean_edge_len = 0; int edge_cnt = 0;
+	edges.resize( vertices.size() );
+	heap.resize_in_queue_pairs( vertices.size() );
 
-void simp(Mesh* mesh)
+	for (int i = 0; i <vertices.size(); i ++ ) 
+		for (auto &ff: vertices[i].fas)
+			for (int &j : ff.dim ) 
+				if (j != i) {
+					edges[i].insert(j);
+					mean_edge_len += vertices[i].cal_dist(vertices[j]);
+					edge_cnt ++;
+				}
+
+	mean_edge_len /= edge_cnt;
+	std:: cerr << "mean edge len: " << mean_edge_len << "\n";
+	for (int i = 0; i < vertices.size(); i ++ ){
+	// std::cerr << i << "\n";
+		for (auto &j : edges[i]) if (i < j)
+			add_pair(i, j);
+	}
+	std::cout <<  "heap size: " << heap.size() << "\n";
+}
+
+void Mesh::simp()
 {
 	// cal Q, stored in map
-	std::cout << "cal Q, stored in map" << std::endl;
-
-	for (int i=0;i< mesh->vertices.size(); i++) {
-		int vid = i;
-
-		Eigen::Matrix4d Q = cal_Q(vid);
-		findQ[vid] = Q;
-		// std::cout << vid << "|" << Q.data << "\n";
-	}
+	cal_Q();
 	// collect valid pairs, push in ti heap;
-	std::cout << "ccollect valid pairs, push in ti heapp" << std::endl;
-
-	for (auto v: mesh->vertices) for (auto &f : v.fas){
-		for (auto& edge: f.getEdges()){
-
-			if (pairDup[edge] == 1) continue;
-			pairDup[edge] = 1;
-			int v1 = edge.vi, v2 = edge.vj;
-
-			double _c =  cal_dist(v1,v2);
-			// std::cerr << "cost:" << _c << "\n";
-			if ( _c < thre_dist){
-
-				// cal cost of possible contraction
-				// we choose v1+v2 as final Q
-				// v hat is the (v1+v2) / 2
-				Eigen::Matrix4d Q = findQ[v1] + findQ[v2];
-				Eigen::Vector4d newx;
-				double cost = cal_cost(v1,v2,Q, newx);
-				// std::cerr << "cost:" << cost << "\n";
-
-				heap.push(ValidPair(v1, v2, cost, newx ));
-				
-			}
-		// std::cout << heap.size() << " ";
-		}
-	}
-		std::cout <<  "heap size: " << heap.size() << "\n";
+	select_pairs();
 
 	// iters
 	// while ( heap.size() && ( mesh->numVertices() > simp_percentage * initNumV) )
 	int cnt = 0;
 
-	std::cout << "cheap iter" << std::endl;
+	std::cout << "heap iter" << std::endl;
 	while ( heap.size() && (cnt++ < iters) )
 	{
 		auto tmp = heap.top(); heap.pop();
-
-		// std::cout << cnt << " |cost:" << tmp.cost << std::endl;
+		std::cout << cnt << " |cost:" << tmp.cost << std::endl;
 		auto vhat = tmp.vhat;
 
-		mesh->contract_v2(tmp.vi, tmp.vj, vhat);
-		
-		// remove pairs linked to v1 or v2;
-		heap.remove_related(tmp.vi);		
-		heap.remove_related(tmp.vj);		
-
-		std::cerr <<  "face num" << mesh->getfacesNum() << "\n";
-
-
-		// to be continued
-		// cal Q of v hat
-		// updateQ();
-
-		// add possible valid pairs corrosponding to hhat
-
-
+		contract_v2(tmp.vi, tmp.vj, vhat);
 	}
 }
 
 
 
+void Mesh::add_pair(int i, int j)
+{
+	// std::cerr << "add " << i << "|" << j << "\n";
+	assert(i != j);
+	if (i > j) std::swap(i, j);
+
+	double _d =  vertices[i].cal_dist(vertices[j]);
+	// std::cerr << i << "|dist:" << _c << "|" << thre_dist << "\n";
+	// if ( _d < thre_dist){
+
+		// cal cost of possible contraction
+		// we choose v1+v2 as final Q
+		// v hat is the (v1+v2) / 2
+		// Eigen::Matrix4d Q = findQ[v1] + findQ[v2];
+		Eigen::Vector4d newx;
+		// update Q, v, cost
+		double cost = cal_cost(i,j, newx);
+		// std::cerr << "cost:" << cost << "\n";
+		auto vp = ValidPair(i, j, cost, newx );
+		heap.push(vp);
+	// }
+}
+
+
+
+
+Mesh *mesh;
 int main(int argc,char *argv[])
 {
 	// if(argc != 5) std::cout << "must send 4 params" << "\n";
@@ -516,32 +701,24 @@ int main(int argc,char *argv[])
 	std::string mesh_path = argv[1];
 	std::string output = argv[2];
 	iters = atoi(argv[3]);
-	thre_dist = atoi(argv[4]);
+	thre_dist = atof(argv[4]);
 
 	mesh = new Mesh();
 	mesh->loadMesh(mesh_path, mesh);   
 	
-	int n = mesh->numVertices();
-	std::cout << "num verts: " << n << std::endl;
-	toDel.resize(n); std::fill(toDel.begin(), toDel.end(), 0);
-
+	int initNumV = mesh->numVertices();
+	toDel.resize(initNumV); std::fill(toDel.begin(), toDel.end(), 0);
+	int init_face_cnt = mesh->numFaces();
 	//  iters;
 	// thre_dist= 1.0;
-	// simp_percentage = 0.5 , 
-	initNumV = n;
-
-	simp(mesh);
-
-    mesh->writeMesh("./result.obj", mesh);
+	// simp_percentage = 0.5, 
+	mesh->simp();
+    mesh->writeMesh(output, mesh);
 	
-
-    // test2_(mesh);
-
-
 	std::cerr << " init Vertex cnt: " << initNumV << "\n";
 	std::cerr << " init Face cnt: " << init_face_cnt << "\n";
 	std::cerr << " post Vertex cnt: " << post_v_cnt << "\n";
-	std::cerr << " post Face cnt: " << mesh->getfacesNum() << "\n";
+	std::cerr << " post Face cnt: " << mesh->numFaces() << "\n";
 
     return 0;
 
