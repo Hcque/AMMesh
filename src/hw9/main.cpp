@@ -1,3 +1,5 @@
+// mesh simplication 
+// ===============================================
 
 // caution summary:
 
@@ -7,9 +9,10 @@
 // idx needs repad when writing
 // costomized heap, Hash
 
-
 // int ? double !!!
 // points. not index for counting !
+// == / = !!
+// local g variable
 
 
 #include "PolyMesh/IOManager.h"
@@ -24,23 +27,21 @@
 #include <unordered_map>
 #include <set>
 #include <time.h>
+#include <chrono>
+
+#define SHRAP_COST 1
+#define DFS_SEARCH 1
 
 using namespace acamcad;
 using namespace polymesh;
 
 
 int iters;
-double thre_dist;
+double t;
 double simp_percentage ;
 int initNumV;
-
-
-
-
 // std::unordered_map<ValidPair, int, ValidPair::HashFunction> pairDup;
 std::vector<int> toDel;
-
-// template <class T>
 
 // std::unordered_map<int , Eigen::Matrix4d> findQ;
 // Heap heap;
@@ -72,6 +73,12 @@ private:
 			}
 			return;
 		}
+		// MVector3 getnormal()
+		// {
+
+
+		// }
+
 
 	
 		bool contain(int vi) const { 
@@ -139,21 +146,19 @@ private:
 		} 
 
 		struct HashFunction
-  {
-    std::size_t operator()(const Face& k) const
-    {
-      using std::size_t;
-      using std::hash;
+		{
+			std::size_t operator()(const Face& k) const
+			{
+			using std::size_t;
+			using std::hash;
 
-      // Compute individual hash values for first,
-      // second and third and combine them using XOR
-      // and bit shifting:
+			// Compute individual hash values for first,
+			// second and third and combine them using XOR
+			// and bit shifting:
 
-      return (hash<int>()(k.dim[0]*(13+k.dim[1]) ) ^ (hash<int>()(( k.dim[2] + 7) * k.dim[0]) << 1) );
-    }
-  };
-
-
+			return (hash<int>()(k.dim[0]*(13+k.dim[1]) ) ^ (hash<int>()(( k.dim[2] + 7) * k.dim[0]) << 1) );
+			}
+		};
 	};
 
 	struct Vertice
@@ -205,126 +210,122 @@ private:
 			return ans;
 		}
 
-		// std::set<int> oneRingNeibours()
-		// {
-		// 	std::set<int> ans;
-		// 	for (auto &ff: fas) 
-		// 		for (int x: ff.dim) if (x != index) ans.insert(x);
-		// 	return ans;
-		// }
+		std::set<int> oneRingNeibours()
+		{
+			std::set<int> ans;
+			for (auto &ff: fas) 
+				for (int x: ff.dim) if (x != index) ans.insert(x);
+			return ans;
+		}
+	};
+
+	struct ValidPair
+	{
+		// MEdge* me;
+		int vi, vj, time;
+		double cost;
+		Eigen::Vector4d vhat;
+		ValidPair() {}
+		ValidPair(int _i, int _j): vi(_i), vj(_j){
+			sort();
+		}
+		ValidPair(int _i, int _j, double _c, Eigen::Vector4d _hat): vi(_i), vj(_j),
+							cost(_c) , vhat(_hat)  {
+			sort();
+		}
+		bool operator<(const ValidPair& other) const { return cost > other.cost; } 
+		bool operator==(const ValidPair& other) const { return vi == other.vi && vj == other.vj;  } 
+		void sort()
+		{
+			if (vi > vj) std::swap(vi,vj);
+		}
+
+		unsigned long long index_hash() const {
+			return ((unsigned long long)(vi) << 32) | (unsigned long long )(vj);
+		}
+
+
+	// // https://stackoverflow.com/questions/17016175/c-unordered-map-using-a-custom-class-type-as-the-key
+
+	//   struct HashFunction
+	//   {
+	//     std::size_t operator()(const ValidPair& k) const
+	//     {
+	//       using std::size_t;
+	//       using std::hash;
+
+	//       // Compute individual hash values for first,
+	//       // second and third and combine them using XOR
+	//       // and bit shifting:
+
+	//       return (hash<int>()(k.vi) ^ (hash<int>()(k.vj) << 1) );
+	//     }
+	//   };
+
 	};
 
 
-
-struct ValidPair
-{
-	// MEdge* me;
-	int vi, vj, time;
-	double cost;
-	Eigen::Vector4d vhat;
-	ValidPair() {}
-	ValidPair(int _i, int _j): vi(_i), vj(_j){
-		sort();
-	}
-	ValidPair(int _i, int _j, double _c, Eigen::Vector4d _hat): vi(_i), vj(_j),
-						cost(_c) , vhat(_hat)  {
-		sort();
-	}
-	bool operator<(const ValidPair& other) const { return cost > other.cost; } 
-	bool operator==(const ValidPair& other) const { return vi == other.vi && vj == other.vj;  } 
-	void sort()
+	struct Heap
 	{
-		if (vi > vj) std::swap(vi,vj);
-	}
+		int tstamp;
+		std::unordered_map<unsigned long long, int > times;
+		std::priority_queue<ValidPair> que;
+		std:: vector< std::set<int>> in_que_pairs;
 
-	unsigned long long index_hash() const {
-		return ((unsigned long long)(vi) << 32) | (unsigned long long )(vj);
-	}
-
-
-// // https://stackoverflow.com/questions/17016175/c-unordered-map-using-a-custom-class-type-as-the-key
-
-//   struct HashFunction
-//   {
-//     std::size_t operator()(const ValidPair& k) const
-//     {
-//       using std::size_t;
-//       using std::hash;
-
-//       // Compute individual hash values for first,
-//       // second and third and combine them using XOR
-//       // and bit shifting:
-
-//       return (hash<int>()(k.vi) ^ (hash<int>()(k.vj) << 1) );
-//     }
-//   };
-
-};
-
-
-struct Heap
-{
-	int tstamp;
-	std::unordered_map<unsigned long long, int > times;
-	std::priority_queue<ValidPair> que;
-	std:: vector< std::set<int>> in_que_pairs;
-
-	Heap() { tstamp = 0; }
-	inline void resize_in_queue_pairs(int n)
-	{
-		in_que_pairs.resize(n);
-	}
-	void clear()
-	{
-		tstamp = 0; times.clear();
-		while (que.size()) que.pop();
-	}
-	inline bool count(unsigned long long index)
-	{
-		return (times.count(index)) ? (times[index] > 0) : false;
-	}
-
-	inline int size() { return que.size(); }
-
-	void refresh()
-	{
-		while (que.size())
+		Heap() { tstamp = 0; }
+		inline void resize_in_queue_pairs(int n)
 		{
-			auto pair = que.top();
-			if (pair.time == times[pair.index_hash()]) break;
+			in_que_pairs.resize(n);
+		}
+		void clear()
+		{
+			tstamp = 0; times.clear();
+			while (que.size()) que.pop();
+		}
+		inline bool count(unsigned long long index)
+		{
+			return (times.count(index)) ? (times[index] > 0) : false;
+		}
+
+		inline int size() { return que.size(); }
+
+		void refresh()
+		{
+			while (que.size())
+			{
+				auto pair = que.top();
+				if (pair.time == times[pair.index_hash()]) break;
+				que.pop();
+			}
+		}
+
+		void pop()
+		{
+			refresh();
 			que.pop();
 		}
-	}
 
-	void pop()
-	{
-		refresh();
-		que.pop();
-	}
+		ValidPair top()
+		{
+			refresh();
+			return que.top();
+		}
 
-	ValidPair top()
-	{
-		refresh();
-		return que.top();
-	}
-
-	void push(ValidPair& pair)
-	{
-		++tstamp ;
-		pair.time = tstamp; times[pair.index_hash()] = tstamp;
-		que.push(pair);
-		in_que_pairs[pair.vi].insert(pair.vj);
-		in_que_pairs[pair.vj].insert(pair.vi);
-	}
-	void del(const ValidPair& pair)
-	{
-		times[pair.index_hash()] = -1;
-		in_que_pairs[pair.vi].erase(pair.vj);
-		in_que_pairs[pair.vj].erase(pair.vi);
-	}
-
-
-};
+		void push(ValidPair& pair)
+		{
+			++tstamp ;
+			pair.time = tstamp; times[pair.index_hash()] = tstamp;
+			que.push(pair);
+			in_que_pairs[pair.vi].insert(pair.vj);
+			in_que_pairs[pair.vj].insert(pair.vi);
+		}
+		void del(const ValidPair& pair)
+		{
+			times[pair.index_hash()] = -1;
+			in_que_pairs[pair.vi].erase(pair.vj);
+			in_que_pairs[pair.vj].erase(pair.vi);
+		}
+	};
 
 // class Heap : public std::priority_queue<ValidPair>
 // {
@@ -345,11 +346,10 @@ struct Heap
 // 	}
 // };
 
-
-
 public:
 	Mesh() { 
-		tot = tot_face = 0; vertices.clear();  
+		tot = tot_face = 0; vertices.clear(); 
+		mean_edge_len = 0.0;
 	}
 	~Mesh() {}
 	int tot, tot_face;
@@ -360,12 +360,14 @@ public:
 	std::vector<int> mapidx;
 	std::unordered_set<Face, Face::HashFunction> fascnt;
 
+	std::vector<int> visit;
+	double mean_edge_len;
 
 	int numFaces() ;
 	int numVertices() const ;
 	void loadMesh(std::string, Mesh* mesh);
 	void writeMesh(std::string, Mesh* mesh);
-	void simp();
+	void simp(); // main procedure
 	void cal_Q();
 	void select_pairs();
 	void contract(int v1, int v2, Eigen::Vector4d);
@@ -378,6 +380,7 @@ public:
 	double cal_cost(int v1, int v2, Eigen::Vector4d& newx );
 	void add_pair(int v0, int v1);
 	std::set<int> oneRingNeibours(int vi);
+	void dfs_search(int now, int);
 
 };
 
@@ -450,9 +453,9 @@ void Mesh::contract_v2(int v1, int v2, Eigen::Vector4d vhat)
 				}
 			}
 		}
-		std::cerr << "constraction" << v2 << "\n";
+		// std::cerr << "constraction" << v2 << "\n";
 		// vertices
-		toDel[v2] = 1;
+		toDel[v2] = 1; tot--;
 		// connect neigbours  to v1
 		// for (auto &sf : vertices[v1].fas) for (int j : sf.dim ) if (j != v1  && j < vertices.size() && !toDel[j])
 		// 	vertices[j].reset(v2,v1);
@@ -494,6 +497,7 @@ void Mesh::loadMesh(std::string mesh_path, Mesh* mesh)
 				ss >> a >> b >> c;
 				// std::cout << a << b << c << "\n";
 				mesh->addVertice(a,b,c, cnt ++ );
+				tot++;
 				break;
 			case 'f':
 				ss >> fa >> fb >> fc;
@@ -613,6 +617,23 @@ double Mesh::cal_cost(int v1, int v2, Eigen::Vector4d& newx )
 	}
 
 	double ans =  ( newx.transpose() * Qnew * newx );
+
+	// add penality for sharp details
+#ifdef SHRAP_COST
+	std:: vector<MVector3> normals;
+	for (auto &ff: vertices[v1].fas){
+		if (ff.contain(v2)){
+			 normals.push_back( getnormal(ff.dim[0],ff.dim[1],ff.dim[2]) );
+		}
+	}
+	if (normals.size() == 2){
+		double penalty = normals[0].dot(normals[1]);
+		// std::cerr << "penalty:" <<penalty << "\n";
+		ans / std::min(1.1, 1.1 + penalty);
+		// ans *std::exp( std::min(1.0, 1.1 + penalty) ) ;
+	}
+
+#endif
 	return ans;
 }
 
@@ -620,7 +641,7 @@ void Mesh::select_pairs()
 {
 	std::cout << "collect valid pairs, push in to heap" << std::endl;
 
-	double mean_edge_len = 0; int edge_cnt = 0;
+	mean_edge_len = 0; int edge_cnt = 0;
 	edges.resize( vertices.size() );
 	heap.resize_in_queue_pairs( vertices.size() );
 
@@ -640,7 +661,32 @@ void Mesh::select_pairs()
 		for (auto &j : edges[i]) if (i < j)
 			add_pair(i, j);
 	}
+
+#ifdef DFS_SEARCH
+	visit.resize(initNumV);
+	for (int i = 0; i < vertices.size(); i ++ )
+	{
+		std::fill(visit.begin(), visit.end(),0);
+		// std::cerr << "ds: " << i << "\n";
+
+		dfs_search(i,i);
+	}
+#endif
 	std::cout <<  "heap size: " << heap.size() << "\n";
+}
+
+void Mesh::dfs_search(int now, int origin)
+{
+	if (vertices[now].cal_dist(vertices[origin]) > mean_edge_len* t) return;
+
+	if (now != origin) add_pair(origin, now);
+	visit[now] = 1;
+	for (auto i: vertices[now].oneRingNeibours())
+	{
+		// std::cerr << i << now <<  "|" << origin << "\n";
+		if (!visit[i])
+			dfs_search(i, origin);
+	}
 }
 
 void Mesh::simp()
@@ -653,15 +699,17 @@ void Mesh::simp()
 	// iters
 	// while ( heap.size() && ( mesh->numVertices() > simp_percentage * initNumV) )
 	int cnt = 0;
+	double final = simp_percentage* (double)initNumV;
 
-	std::cout << "heap iter" << std::endl;
-	while ( heap.size() && (cnt++ < iters) )
+	std::cout << "heap iteration" << std::endl;
+	while ( heap.size() && tot >= final )
 	{
 		auto tmp = heap.top(); heap.pop();
-		std::cout << cnt << " |cost:" << tmp.cost << std::endl;
+		// std::cout << tot   <<"|"<< final << " |cost:" << tmp.cost << std::endl;
 		auto vhat = tmp.vhat;
 
 		contract_v2(tmp.vi, tmp.vj, vhat);
+		cnt++ ;
 	}
 }
 
@@ -681,12 +729,12 @@ void Mesh::add_pair(int i, int j)
 		// we choose v1+v2 as final Q
 		// v hat is the (v1+v2) / 2
 		// Eigen::Matrix4d Q = findQ[v1] + findQ[v2];
-		Eigen::Vector4d newx;
-		// update Q, v, cost
-		double cost = cal_cost(i,j, newx);
-		// std::cerr << "cost:" << cost << "\n";
-		auto vp = ValidPair(i, j, cost, newx );
-		heap.push(vp);
+	Eigen::Vector4d newx;
+	// update Q, v, cost
+	double cost = cal_cost(i,j, newx);
+	// std::cerr << "cost:" << cost << "\n";
+	auto vp = ValidPair(i, j, cost, newx );
+	heap.push(vp);
 	// }
 }
 
@@ -700,13 +748,15 @@ int main(int argc,char *argv[])
 
 	std::string mesh_path = argv[1];
 	std::string output = argv[2];
-	iters = atoi(argv[3]);
-	thre_dist = atof(argv[4]);
+	simp_percentage = atof(argv[3]);
+	t = atof(argv[4]);
+	std::cerr << simp_percentage << "\n";
 
+	auto start = std::chrono::high_resolution_clock::now();
 	mesh = new Mesh();
 	mesh->loadMesh(mesh_path, mesh);   
 	
-	int initNumV = mesh->numVertices();
+	initNumV = mesh->numVertices();
 	toDel.resize(initNumV); std::fill(toDel.begin(), toDel.end(), 0);
 	int init_face_cnt = mesh->numFaces();
 	//  iters;
@@ -714,6 +764,9 @@ int main(int argc,char *argv[])
 	// simp_percentage = 0.5, 
 	mesh->simp();
     mesh->writeMesh(output, mesh);
+
+	auto end = std::chrono::high_resolution_clock::now();
+	std :: cerr << "time comsumption: " <<  (end- start).count() / 1000000 / 10000.0 << std::endl;
 	
 	std::cerr << " init Vertex cnt: " << initNumV << "\n";
 	std::cerr << " init Face cnt: " << init_face_cnt << "\n";
