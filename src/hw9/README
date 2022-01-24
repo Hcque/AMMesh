@@ -1,4 +1,4 @@
-The implenmenting the mesh simplification described in "Surface Simplification Using Quadric Error Metrics";
+# The implenmenting the mesh simplification described in "Surface Simplification Using Quadric Error Metrics";
 
 I gets familiarity on Eigen and various data structures. Particularity , I combine the hash table and priority queue to achieve O(1) entry deletion.
 Other exploration detail:
