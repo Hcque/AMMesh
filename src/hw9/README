@@ -1,11 +1,12 @@
-# The implenmenting the mesh simplification described in "Surface Simplification Using Quadric Error Metrics";
+# The implenmention of mesh simplification described in "Surface Simplification Using Quadric Error Metrics";
 
-I gets familiarity on Eigen and various data structures. Particularity , I combine the hash table and priority queue to achieve O(1) entry deletion.
+I get familiarity on Eigen and various data structures. Particularity , I combine the hash table and priority queue to achieve O(1) entry deletion.
 Other exploration detail:
 1) to try different terms on the error function when selecting edges to eliminate. 
-2) dfs, with bounded depth , for selection indirected neighbour edges 
+2) dfs, with bounded depth , for selection indirected neighbour edges with topological adjacency.
 
-The speed of this algorithm tested on 50000 dragon model for simplify ratio 0.001 needs 10s.
+The speed of this algorithm tested on a 50000-facets dragon model (with simplify ratio 0.001) needs 10s on my machine. 
+For details please see the report.pdf
 
 The result on glimpse:
 ![ScreenShot](https://github.com/Hcque/AMMesh/blob/main/src/hw9/dia.png)
